@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useStudents } from '@/hooks/useStudents';
 import { StudentCard } from '@/components/StudentCard';
-import { AddStudentModal } from '@/components/AddStudentModal';
+import { StudentModal } from '@/components/StudentModal';
 import { StatsGrid } from '@/components/StatsGrid';
 import { EmptyState } from '@/components/EmptyState';
 import { useToast } from '@/hooks/use-toast';
@@ -31,6 +31,15 @@ const Index = () => {
 
   const handleAddStudent = async (studentData: Omit<Student, 'id' | 'joinDate' | 'adherenceRate' | 'status'>) => {
     await addStudent(studentData);
+  };
+
+  const handleUpdateStudent = async (id: string, updates: Partial<Student>) => {
+    await updateStudent(id, updates);
+    toast({
+      title: "Aluno atualizado",
+      description: "Informações atualizadas com sucesso!"
+    });
+    setEditingStudent(null);
   };
 
   const handleRemoveStudent = async (id: string) => {
@@ -157,13 +166,25 @@ const Index = () => {
       </div>
 
       {/* Add Student Modal */}
-      <AddStudentModal
+      <StudentModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddStudent}
         isLoading={isLoading}
         canAddStudent={canAddStudent}
         remainingSlots={remainingSlots}
+      />
+
+      {/* Edit Student Modal */}
+      <StudentModal
+        open={!!editingStudent}
+        onClose={() => setEditingStudent(null)}
+        onAdd={handleAddStudent}
+        onUpdate={handleUpdateStudent}
+        isLoading={isLoading}
+        canAddStudent={canAddStudent}
+        remainingSlots={remainingSlots}
+        editingStudent={editingStudent}
       />
     </div>
   );

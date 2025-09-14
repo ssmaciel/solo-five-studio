@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,23 +7,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Student } from '@/types/student';
 
-interface AddStudentModalProps {
+interface StudentModalProps {
   open: boolean;
   onClose: () => void;
   onAdd: (studentData: Omit<Student, 'id' | 'joinDate' | 'adherenceRate' | 'status'>) => Promise<void>;
+  onUpdate?: (id: string, studentData: Partial<Student>) => Promise<void>;
   isLoading: boolean;
   canAddStudent: boolean;
   remainingSlots: number;
+  editingStudent?: Student | null;
 }
 
-export function AddStudentModal({ 
+export function StudentModal({ 
   open, 
   onClose, 
   onAdd, 
+  onUpdate,
   isLoading, 
   canAddStudent, 
-  remainingSlots 
-}: AddStudentModalProps) {
+  remainingSlots,
+  editingStudent
+}: StudentModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -35,37 +39,23 @@ export function AddStudentModal({
     height: ''
   });
 
-  const { toast } = useToast();
+  const isEditing = !!editingStudent;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!canAddStudent) {
-      toast({
-        title: "Limite atingido",
-        description: "Você já tem o máximo de 5 alunos.",
-        variant: "destructive"
+  // Populate form when editing
+  React.useEffect(() => {
+    if (editingStudent) {
+      setFormData({
+        name: editingStudent.name,
+        email: editingStudent.email,
+        phone: editingStudent.phone,
+        age: editingStudent.age.toString(),
+        goal: editingStudent.goal,
+        currentWeight: editingStudent.currentWeight?.toString() || '',
+        targetWeight: editingStudent.targetWeight?.toString() || '',
+        height: editingStudent.height?.toString() || ''
       });
-      return;
-    }
-
-    try {
-      await onAdd({
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        age: parseInt(formData.age),
-        goal: formData.goal,
-        currentWeight: formData.currentWeight ? parseFloat(formData.currentWeight) : undefined,
-        targetWeight: formData.targetWeight ? parseFloat(formData.targetWeight) : undefined,
-        height: formData.height ? parseFloat(formData.height) : undefined
-      });
-
-      toast({
-        title: "Aluno adicionado!",
-        description: `${formData.name} foi adicionado com sucesso.`
-      });
-
+    } else {
+      // Reset form for new student
       setFormData({
         name: '',
         email: '',
@@ -76,11 +66,53 @@ export function AddStudentModal({
         targetWeight: '',
         height: ''
       });
-      
+    }
+  }, [editingStudent]);
+
+  const { toast } = useToast();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!isEditing && !canAddStudent) {
+      toast({
+        title: "Limite atingido",
+        description: "Você já tem o máximo de 5 alunos.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const studentData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        age: parseInt(formData.age),
+        goal: formData.goal,
+        currentWeight: formData.currentWeight ? parseFloat(formData.currentWeight) : undefined,
+        targetWeight: formData.targetWeight ? parseFloat(formData.targetWeight) : undefined,
+        height: formData.height ? parseFloat(formData.height) : undefined
+      };
+
+      if (isEditing && editingStudent && onUpdate) {
+        await onUpdate(editingStudent.id, studentData);
+        toast({
+          title: "Aluno atualizado!",
+          description: `${formData.name} foi atualizado com sucesso.`
+        });
+      } else {
+        await onAdd(studentData);
+        toast({
+          title: "Aluno adicionado!",
+          description: `${formData.name} foi adicionado com sucesso.`
+        });
+      }
+
       onClose();
     } catch (error) {
       toast({
-        title: "Erro ao adicionar aluno",
+        title: isEditing ? "Erro ao atualizar aluno" : "Erro ao adicionar aluno",
         description: error instanceof Error ? error.message : "Tente novamente.",
         variant: "destructive"
       });
@@ -91,7 +123,7 @@ export function AddStudentModal({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  if (!canAddStudent) {
+  if (!isEditing && !canAddStudent) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-md">
@@ -120,7 +152,12 @@ export function AddStudentModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Novo Aluno ({remainingSlots} vagas restantes)</DialogTitle>
+          <DialogTitle>
+            {isEditing 
+              ? `Editar Aluno: ${editingStudent?.name}` 
+              : `Novo Aluno (${remainingSlots} vagas restantes)`
+            }
+          </DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -236,7 +273,10 @@ export function AddStudentModal({
               className="flex-1"
               disabled={isLoading}
             >
-              {isLoading ? 'Adicionando...' : 'Adicionar Aluno'}
+              {isLoading 
+                ? (isEditing ? 'Atualizando...' : 'Adicionando...') 
+                : (isEditing ? 'Atualizar Aluno' : 'Adicionar Aluno')
+              }
             </Button>
           </div>
         </form>
